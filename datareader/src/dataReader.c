@@ -41,7 +41,7 @@ int main() {
 
     // Generate the message queue key
     key_t msgKey = ftok(".", 16535);
-
+	printf("Creating message queue...\n");
     if(msgq_id = msgget(msgKey, 0) == -1) 
 	{
 		msgq_id = msgget(msgKey, (IPC_CREAT | 0660));
@@ -52,7 +52,7 @@ int main() {
 		}
 	}
 
-
+	printf("Allocating shared memory...\n");
     // Create shared memory segment for master list
     key_t shmKey = ftok(".", 16535);
     shm_id = shmget(shmKey, sizeof(struct master_list), IPC_CREAT | 0660);

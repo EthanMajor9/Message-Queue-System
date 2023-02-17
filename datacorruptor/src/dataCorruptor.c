@@ -34,7 +34,7 @@ int main() {
     key_t shm_key;
     key_t msgq_key;
     MasterList* master_list;
-    int wod[WOD_SIZE] = {0, 1, 2, 3 ,4 ,5 ,6 ,7 ,8 ,9, 10, 11, 12, 13, 14, 15, 16 ,17, 18, 19, 20};
+    int wod[WOD_SIZE] = {0, 1, 2, 3 ,4 ,5 ,6 ,7 ,8 ,9, 10, 11, 12, 13, 14, 15, 16 ,17, 18, 19};
     // initialize random number generator
     srand(time(NULL));
 
@@ -112,6 +112,7 @@ int main() {
                 break;
 
         }
+	}
 
     return 0;
 }
