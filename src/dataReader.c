@@ -37,11 +37,11 @@ int main() {
         char mtext[MAX_MSG_LEN];
     } msg;
 
-     struct shmid_ds shmid_ds;
+    struct shmid_ds shmid_ds;
 
     // Create message queue
     key_t msgKey = ftok(".", 16535);
-    msgq_id = msgget(msgKey, IPC_CREAT | 0666);
+    msgq_id = msgget(msgKey, IPC_CREAT | 0);
     if (msgq_id == -1) {
         perror("msgget");
         exit(1);
@@ -49,7 +49,7 @@ int main() {
 
     // Create shared memory segment for master list
     key_t shmKey = ftok(".", 16535);
-    shm_id = shmget(shmKey, sizeof(struct master_list), IPC_CREAT | 0666);
+    shm_id = shmget(shmKey, sizeof(struct master_list), IPC_CREAT | 0);
     if (shm_id == -1) {
         perror("shmget");
         exit(1);

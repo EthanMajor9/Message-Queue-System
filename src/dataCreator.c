@@ -20,9 +20,9 @@
 
 
 // Define the message queue key and message types
-#define MSG_KEY 12345
-#define MSG_OK 1
-#define MSG_FAIL 2
+#define MSG_OK 0
+#define MSG_FAIL 1
+#define MSG_SAFTEYFAIL 2
 #define MSG_NOMATERIAL 3
 #define MSG_TEMPOUTOFRANGE 4
 #define MSG_OPERERROR 5
@@ -37,7 +37,7 @@
 
 // Function to generate a random status value
 int getRandomStatus() {
-  return rand() % 6 + 1;
+  return rand() % 7;
 }
 
 // Define the textual descriptions for the different status codes
@@ -64,7 +64,7 @@ void logMessage(int pid, int status) {
     fclose(file);
 }
 
-int running = 1;
+
 
 
 int main() {
@@ -73,6 +73,7 @@ int main() {
     int interval;
     int status;
     int count = 0;
+    int running = 1;
     
     struct msgbuf {
         int mtype;
@@ -83,14 +84,17 @@ int main() {
     // Initialize the random number generator
     srand(time(NULL));
 
+    key_t msgKey = ftok(".", 16535);
+
     // Try to create or get the message queue
-    while(msgqid = msgget(MSG_KEY, 0666 | IPC_CREAT)== -1){ 
-        if(errno == EEXIST){
+    while((msgqid = msgget(msgKey, 0))== -1){ 
+        if(errno == ENOENT){
+            sleep(10);
             break;
         }
         else {            
             perror("msgget failed");
-            sleep(10);
+            exit(EXIT_FAILURE);
         }      
     }
   
@@ -129,7 +133,7 @@ int main() {
             msg.mtype = MSG_FAIL;
             break;
         case 2:
-            msg.mtype = MSG_FAIL;
+            msg.mtype = MSG_SAFTEYFAIL;
             break;
         case 3:
             msg.mtype = MSG_NOMATERIAL;
@@ -176,4 +180,3 @@ int main() {
     
     return 0;
 }
-
