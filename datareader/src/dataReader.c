@@ -1,185 +1,210 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <time.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/shm.h>
+#include "../inc/dataReader.h"
 
-#define MAX_MACHINES 10
-#define MAX_MSG_LEN 100
+int main(int argc, char* argv[]) 
+{
+	MasterList *masterList;
+	Message message;
+	int qID = 0;
+	key_t msgQueueKey;
+	int shmID = 0;
+	key_t shmKey;
+	int running = 1;
+	Log log;
+	FILE* logfile = NULL;
 
-#define TIMEOUT 60
+	msgQueueKey = ftok(".",  16535);
+	shmKey = ftok(".",  16535);
 
-struct machine_status {
-    int id;
-    char status[MAX_MSG_LEN];
-    time_t last_msg_time;
-};
+	qID = checkMessageQueueExists(msgQueueKey);
+	shmID = checkSharedMemExists(shmKey);
+	
+	printf("Message Queue ID: %d\nShared mem ID: %d\n", qID, shmID);
+
+	// Attach shared mem to masterList
+	if((masterList = shmat(shmID, NULL, 0)) == (void*) -1) {
+		perror("SHMAT error:");
+		exit(-1);
+	}
+
+	// Init the master list
+	masterList->msgQueueID = qID;
+	masterList->numberOfDCs = 0;
+
+	for (int i = 0; i < 10; i++) {
+		masterList->dc[i].dcProcessID = 0;
+		masterList->dc[i].lastTimeHeardFrom = 0;
+	}
+
+	sleep(15);
+
+	// Open logfile
+	logfile = fopen(logfilepath, "w");
+
+	if(logfile == NULL) {
+		perror("fopen");
+		exit(-1);
+	}
+
+	// Start processing messages
+	processMessages(masterList, logfile);
+
+	// Detach the shared memory from the masterlist
+	if (shmdt(masterList) == -1) {
+        perror("shmdt");
+        exit(1);
+    }
+
+	// Deallocate the message queue and shared memory
+	if (msgctl(qID, IPC_RMID, NULL) == -1 || shmctl(shmID, IPC_RMID, NULL) == -1) {
+		perror("msgctl");
+	}
+
+	// Close log file
+	fclose(logfile);
+}
 
 
-struct master_list {
-    struct machine_status machines[MAX_MACHINES];
-    int num_active;
-    int msgq_id;
-};
 
-int main() {
-    int shm_id;
-    int msgq_id;
-    int i;
-    
-    struct master_list *mlist;
-    
-    struct msgbuf {
-        long mtype;
-        char mtext[MAX_MSG_LEN];
-    } msg;
+int checkMessageQueueExists(key_t msgQueueKey) {
+	int qID;
+	// Check for msg queue exist
+	if((qID = msgget(msgQueueKey, 0)) == -1) {
+		// Create message queue
+		qID = msgget(msgQueueKey, (IPC_CREAT | 0660));
 
-    struct shmid_ds shmid_ds;
-
-    // Generate the message queue key
-    key_t msgKey = ftok(".", 16535);
-	printf("Creating message queue...\n");
-    if(msgq_id = msgget(msgKey, 0) == -1) 
-	{
-		msgq_id = msgget(msgKey, (IPC_CREAT | 0660));
-
-		if (msgq_id == -1) {
-			perror("msgget");
+		// Check for any errors when creating message queue
+		if(qID == -1) {
+			perror("Error creating message queue:");
 			exit(-1);
 		}
 	}
+	return qID;
+}
 
-	printf("Allocating shared memory...\n");
-    // Create shared memory segment for master list
-    key_t shmKey = ftok(".", 16535);
-    shm_id = shmget(shmKey, sizeof(struct master_list), IPC_CREAT | 0660);
-    if (shm_id == -1) {
-        perror("shmget");
-        exit(1);
+
+int checkSharedMemExists(key_t sharedMemKey) {
+	int shmID;
+	// Check for shared mem existence
+	if((shmID = shmget(sharedMemKey, sizeof(MasterList), 0)) == -1) {	
+		// Allocate shared mem segment
+		shmID = shmget(sharedMemKey, sizeof(MasterList), (IPC_CREAT | 0660));
+
+		// Check for allocation errors
+		if (shmID == -1) {
+			perror("Error creating message queue:");
+			exit(-1);
+		}
+	}
+	return shmID;
+}
+
+
+void LogMessage(FILE* logfile, Log* log) {
+	char formattedTime[TIME_LENGTH];
+	// Format the time
+	strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", log->timestamp);
+	// Log to the file
+	fprintf(logfile, "[%s] : DC-%d [%d] %s - %s - %d (%s)\n", formattedTime, log->entryNum, log->pid, log->operation,log->statusmsg, log->status, log->statusmsg);
+}
+
+Log createLogEntry(int entryNum, int pid, int status, char* statusMsg, char* operation) {
+    Log log;
+	// Fill the log struct
+    log.entryNum = entryNum;
+    log.pid = pid;
+    log.status = status;
+	time_t current_time = time(NULL);
+    log.timestamp = localtime(&current_time);
+    log.statusmsg = statusMsg;
+    log.operation = operation;
+    return log;
+}
+
+
+void removeEntryFromMasterList(MasterList* masterList, int index) {
+    for (int j = index; j < MAX_DC_ROLES - 1; j++) {
+        masterList->dc[j] = masterList->dc[j + 1];
     }
+    memset(&masterList->dc[MAX_DC_ROLES - 1], 0, sizeof(DCInfo));
+}
 
-    // Attach shared memory segment to process
-    mlist = shmat(shm_id, NULL, 0);
-    if (mlist == (struct master_list *) -1) {
-        perror("shmat");
-        exit(1);
-    }
+void checkAndRemoveTimedOutEntries(MasterList* masterList, Message message, FILE* logfile) {
+	// Iterate over all the DC's in the master list
+	for (int i = 0; i < MAX_DC_ROLES; i++) {
+		// Check if the DC process ID is not 0, which means there is a DC at this position in the master list
+		if (masterList->dc[i].dcProcessID != 0) {
+			// Check if the time elapsed since the last time this DC was heard from is longer than 35 seconds
+			if (time(NULL) - masterList->dc[i].lastTimeHeardFrom >= 35) {
+				Log log = createLogEntry(i, message.pid, message.status, message.statusMsg, "has gone OFFLINE");
+				LogMessage(logfile, &log);
+				removeEntryFromMasterList(masterList, i);
+				masterList->numberOfDCs--;
+				i--;
+			}
+		}
+	}
+}
 
-    // Initialize master list
-    mlist->num_active = 0;
-    mlist->msgq_id = msgq_id;
-    for (i = 0; i < MAX_MACHINES; i++) {
-        mlist->machines[i].id = -1;
-        strcpy(mlist->machines[i].status, "offline");
-    }
-
-    // Main loop to process messages
-    while (1) {
-        // Wait for message from message queue
-        if (msgrcv(msgq_id, &msg, MAX_MSG_LEN, 0, 0) == -1) {
-            perror("msgrcv");
-            exit(1);
+void updateOrAddDCMessage(MasterList* masterList, Message message, FILE* logfile) {
+    for (int i = 0; i < MAX_DC_ROLES; i++) {
+        if(message.pid == masterList->dc[i].dcProcessID) {
+            masterList->dc[i].lastTimeHeardFrom = time(NULL);
+            Log log = createLogEntry(i, message.pid, message.status, message.statusMsg, "updated in the master list");
+            LogMessage(logfile, &log);
+            return;
+        } else if (masterList->dc[i].dcProcessID == 0) {
+            masterList->numberOfDCs++;
+            masterList->dc[i].dcProcessID = message.pid;
+            masterList->dc[i].lastTimeHeardFrom = time(NULL);
+			printf("Added to masterlist\n");
+            Log log = createLogEntry(i, message.pid, message.status, message.statusMsg, "added to the master list");
+            LogMessage(logfile, &log);
+            return;
         }
+    }
+}
 
-        // Parse message to extract machine ID and status
-        int id;
-        char status[MAX_MSG_LEN];
-        sscanf(msg.mtext, "%d %s", &id, status);
+void processStatus6Message(MasterList* masterList, Message message, FILE* logfile) {
+	// Iterate through all DC's
+    for (int i = 0; i < MAX_DC_ROLES; i++) {
+		// Check if the offline DC matches the current DC in the list
+        if (masterList->dc[i].dcProcessID == message.pid) {
+            Log log = createLogEntry(i, message.pid, message.status, message.statusMsg, "removed from the master list");
+            LogMessage(logfile, &log);
+            removeEntryFromMasterList(masterList, i);
+            masterList->numberOfDCs--;
+            break;
+        }
+    }
+}
 
-        // Check if machine is already in master list
-        int idx = -1;
-        for (i = 0; i < MAX_MACHINES; i++) {
-            if (mlist->machines[i].id == id) {
-                idx = i;
-                break;
+void processMessages(MasterList* masterList, FILE* logfile) {
+	int running = 1;
+    Message message;
+    while (running) {
+		// Receive a message from the message queue
+        if (msgrcv(masterList->msgQueueID, &message, (sizeof(message) - sizeof(long)), 0, 0) == -1) {
+            if (errno != ENOMSG) {
+                perror("msgrcv");
+                exit(-1);
             }
         }
 
-        // If machine is new, add it to master list
-        if (idx == -1) {
-            for (i = 0; i < MAX_MACHINES; i++) {
-                if (mlist->machines[i].id == -1) {
-                    idx = i;
-                    mlist->num_active++;
-                    break;
-                }
-            }
+		// Check if the machine has gone offline
+        if (message.status == 6) {
+            processStatus6Message(masterList, message, logfile);
+        } else {
+            updateOrAddDCMessage(masterList, message, logfile);
         }
 
-        // Update machine status in master list
-        if (idx != -1) {
-            strcpy(mlist->machines[idx].status, status);
-        }
+		// Check the masterlist for any entries that have timed out
+        checkAndRemoveTimedOutEntries(masterList, message, logfile);
 
-        // Log event as required
-
-        // Check for machines that have gone offline
-        time_t curr_time = time(NULL);
-        for (i = 0; i < MAX_MACHINES; i++) {
-            if (mlist->machines[i].id != -1) {
-                struct shmid_ds shmid_ds;
-                // If machine is new, add it to master list
-                if (idx == -1) {
-                    for (i = 0; i < MAX_MACHINES; i++) {
-                        if (mlist->machines[i].id == -1) {
-                            idx = i;
-                            mlist->num_active++;
-                            mlist->machines[idx].last_msg_time = time(NULL); // initialize last_msg_time
-                            break;
-                        }
-                    }
-                }
-                // Update machine status in master list
-                if (idx != -1) {
-                    strcpy(mlist->machines[idx].status, status);
-                }
-
-                // Log event as required
-
-                // Check for machines that have gone offline
-                time_t curr_time = time(NULL);
-                for (i = 0; i < MAX_MACHINES; i++) {
-                    if (mlist->machines[i].id != -1) {
-                        if (strcmp(mlist->machines[i].status, "offline") != 0 &&
-                            curr_time - mlist->machines[i].last_msg_time > TIMEOUT) {
-                            mlist->machines[i].last_msg_time = curr_time;
-                            strcpy(mlist->machines[i].status, "offline");
-
-                            printf("Machine %d has gone offline\n", mlist->machines[i].id);
-                        }
-                    }
-                }
-
-                // Detach shared memory segment from process
-                if (shmdt(mlist) == -1) {
-                    perror("shmdt");
-                    exit(1);
-                }
-
-                // Log event as required
-
-                // Check for termination signal from controller process
-                if (msgrcv(msgq_id, &msg, MAX_MSG_LEN, 1, IPC_NOWAIT) != -1) {
-                    printf("Master process received termination signal\n");
-                    break;
-                }
-            }
-        }
+		// Check if any DC's are currently running
+        if (masterList->numberOfDCs == 0) {
+            running = 0;
+        } else {
+			sleep(1.5);
+		}
     }
-    // Remove message queue
-    if (msgctl(msgq_id, IPC_RMID, NULL) == -1) {
-        perror("msgctl");
-        exit(1);
-    }
-
-    // Remove shared memory segment
-    if (shmctl(shm_id, IPC_RMID, &shmid_ds) == -1) {
-        perror("shmctl");
-        exit(1);
-    }
-
-    return 0;
 }

@@ -3,7 +3,7 @@
 	cc ./obj/datacreator.o -o ./bin/dataCreator
 
 # DEPENDENCIES
-./obj/datacreator.o : ./src/dataCreator.c
+./obj/datacreator.o : ./src/dataCreator.c ./inc/dataCreator.h
 	cc -c ./src/dataCreator.c -o ./obj/datacreator.o
 
 # OTHER TARGETS
