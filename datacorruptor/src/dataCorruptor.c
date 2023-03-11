@@ -1,118 +1,179 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <sys/ipc.h>
-#include <sys/shm.h>
-#include <sys/types.h>
-#include <sys/msg.h>
-#include <unistd.h>
-#include <signal.h>
-#include <time.h>
-#include <stddef.h>
+#include "../inc/dataCorruptor.h"
 
-#define MAX_DC_ROLES 10
-#define WOD_SIZE  20
 
-typedef struct
-{
-    pid_t dcProcessID;
-    time_t lastTimeHeardFrom;
-} DCInfo;
-
-typedef struct
-{
-    int msgQueueID;
-    int numberOfDCs;
-    DCInfo dc[MAX_DC_ROLES];
-} MasterList;
-
+// TODO:
+//	LOGGING
+//  ERROR HANDLING
+//	CLEANUP
 
 int main() {
-    int shm_id = 0;
-    int msgq_id = 0;
+    int shmID = 0;
     int retries = 0;
-    int dc_exists = 0;
-    key_t shm_key;
-    key_t msgq_key;
-    MasterList* master_list;
-    int wod[WOD_SIZE] = {0, 1, 2, 3 ,4 ,5 ,6 ,7 ,8 ,9, 10, 11, 12, 13, 14, 15, 16 ,17, 18, 19};
+    key_t shmKey;
+    key_t msgQueueKey;
+    MasterList* masterList;
+
     // initialize random number generator
     srand(time(NULL));
 
     // create the shared memory key
-    shm_key = ftok(".", 16535);
-    if (shm_key == -1) {
-        perror("ftok");
+    shmKey = ftok(".", 16535);
+    if (shmKey == -1) {
+        perror("FTOK Error");
         exit(EXIT_FAILURE);
     }
 
     // try to attach to shared memory
-    while (retries < 100) {
-        shm_id = shmget(shm_key, sizeof(int), 0);
-        if (shm_id != -1) {
-            break;
-        }
+    while (retries < MAX_RETRIES) {
+        if((shmID = shmget(shmKey, sizeof(MasterList), 0)) != -1) {
+			break;
+		}
         retries++;
         sleep(10);
     }
 
     // exit if retries hit 100
-    if (retries == 100) {
+    if (retries == MAX_RETRIES) {
         exit(EXIT_FAILURE);
     }
 
-    // attach to shared memory
-    master_list = (MasterList*) shmat(shm_id, NULL, 0);
-    if (master_list == (MasterList*) -1) {
-        perror("shmat");
-        exit(EXIT_FAILURE);
-    }
-
-    // create the message queue key
-    msgq_key = ftok(".", 16536);
-    if (msgq_key == -1) {
-        perror("ftok");
-        exit(EXIT_FAILURE);
-    }
-
-    // try to attach to message queue
-    msgq_id = msgget(msgq_key, 0);
-    if (msgq_id == -1) {
-        perror("msgget");
-        exit(EXIT_FAILURE);
-    }
-
-    // main processing loop
-    while (1) {
-        // sleep for a random amount of time between 10 and 30
-        sleep(rand() % 21 + 10);
-
-        // check if message queue still exists
-        if (msgctl(msgq_id, IPC_STAT, NULL) == -1) {
-            if (dc_exists) {
-                fprintf(stderr, "msgQ is gone");
-                shmdt(master_list);
-                exit(EXIT_SUCCESS);
-            }
-        } else {
-            dc_exists = 1;
-        }
-
-        int action = wod[rand() % WOD_SIZE];
-
-        switch (action)
-        {
-            case 0:
-
-                break;
-            case 1: 
-
-                break;
-            case 2:
-
-                break;
-
-        }
+	// Attach shared mem to masterList
+	if((masterList = shmat(shmID, NULL, 0)) == (void*) -1) {
+		perror("SHMAT error:");
+		exit(EXIT_FAILURE);
 	}
 
-    return 0;
+	wheelOfDeath(masterList, shmID);
+
+	// Detach the shared memory from the masterlist
+	if (shmdt(masterList) == -1) {
+        perror("SHMDT Error:");
+        exit(1);
+    }
+}
+
+
+void wheelOfDeath(MasterList* masterList, int shmID) {
+	int running = 1;
+	int randomNum;
+	int interval;
+
+	while(running) {
+		// Sleep for random interval between 10 and 30 seconds
+		interval = (rand() % 21) + MIN_INTERVAL;
+		sleep(interval);
+
+		if(checkMessageQueueExists(masterList) == 0) {
+			return;
+		}
+
+		randomNum = rand() % 21;
+		printf("Randomnum = %d\n", randomNum);
+		switch(randomNum) {
+			// Do nothing
+			case 0:
+			case 8:
+			case 19:
+				break;
+			//Kill DC-01
+			case 1:
+			case 4:
+			case 11:
+				if(masterList->dc[0].dcProcessID != 0) {
+					killDC(masterList->dc[0].dcProcessID);
+				}
+				break;
+			// Kill DC-02
+			case 3:
+			case 6:
+			case 13:
+				if(masterList->dc[1].dcProcessID != 0) {
+					killDC(masterList->dc[1].dcProcessID);
+				}
+				break;
+			// Kill DC-03
+			case 2:
+			case 5:
+			case 15:
+				if(masterList->dc[2].dcProcessID != 0) {
+					killDC(masterList->dc[2].dcProcessID);
+				}
+				break;
+			// Kill DC-04
+			case 7:
+				if(masterList->dc[3].dcProcessID != 0) {
+					killDC(masterList->dc[3].dcProcessID);
+				}
+				break;
+			// Kill DC-05
+			case 9:
+				if(masterList->dc[4].dcProcessID != 0) {
+					killDC(masterList->dc[4].dcProcessID);
+				}
+				break;
+			// Delete message queue
+			case 10:
+			case 17:
+				killMessageQueue(masterList->msgQueueID);
+				break;
+			// Kill DC-06
+			case 12:
+				if(masterList->dc[5].dcProcessID != 0) {
+					killDC(masterList->dc[5].dcProcessID);
+				}
+				break;
+			// Kill DC-07
+			case 14:
+				if(masterList->dc[6].dcProcessID != 0) {
+					killDC(masterList->dc[6].dcProcessID);
+				}
+				break;
+			// Kill DC-08
+			case 16:
+				if(masterList->dc[7].dcProcessID != 0) {
+					killDC(masterList->dc[7].dcProcessID);
+				}
+				break;
+			// Kill DC-09
+			case 18:
+				if(masterList->dc[8].dcProcessID != 0) {
+					killDC(masterList->dc[8].dcProcessID);
+				}
+				break;
+			// Kill DC-10
+			case 20:
+				if(masterList->dc[9].dcProcessID != 0) {
+					killDC(masterList->dc[9].dcProcessID);
+				}
+				break;
+		}
+	}	
+} 
+
+int checkMessageQueueExists(MasterList* masterList) {
+    // Check if queue exists
+	printf("MSG Queue ID : %d\n", masterList->msgQueueID);
+	if(msgctl(masterList->msgQueueID, IPC_STAT, NULL) == -1) {
+		if (errno == ENOENT) {
+			// Detach the shared memory from the masterlist
+			if (shmdt(masterList) == -1) {
+				perror("SHMDT Error:");
+				exit(EXIT_FAILURE);
+			}
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void killDC(int DCtoKill){
+	if(kill(DCtoKill, SIGHUP) == -1) {
+		perror("KILL Error:");
+	}
+}
+
+void killMessageQueue(int msgQueueID) {
+	if(msgctl(msgQueueID, IPC_RMID, NULL) == -1) {
+		perror("MSGCCTL Error:");
+	}
 }

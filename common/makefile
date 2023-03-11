@@ -1,4 +1,7 @@
+all:
+	mkdir -p bin
+	cp -r ../datacorruptor/bin/* ../datareader/bin/* bin/
+	cp -r ../datacorruptor/obj/* ../datareader/obj/* obj/
+
 clean:
-	rm -f ./bin/*
-	rm -f ./obj/*.o
-	
+	rm -rf bin/* obj/*

@@ -1,6 +1,9 @@
 
 #include "../inc/dataCreator.h"
 
+// TODO:
+//	FIX KEY GENERATION
+
 const Status STATUSES[] = {
     {MSG_OK, 1, "Everything is OKAY"},
     {MSG_FAIL, 2, "Hydraulic Pressure Failure"},

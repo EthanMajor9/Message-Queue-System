@@ -1,13 +1,13 @@
 # FINAL BINARY TARGET
-./bin/datacorruptor : ./obj/datacorruptor.o
-	cc ./obj/datacorruptor.o -o ./bin/datacorruptor
+./bin/dataCorruptor : ./obj/dataCorruptor.o
+	cc ./obj/dataCorruptor.o -o ./bin/dataCorruptor
 
 # DEPENDENCIES
-./obj/datacorruptor.o : ./src/dataCorruptor.c
-	cc -c ./src/dataCorruptor.c -o ./obj/datacorruptor.o
+./obj/dataCorruptor.o : ./src/dataCorruptor.c ./inc/dataCorruptor.h
+	cc -c ./src/dataCorruptor.c -o ./obj/dataCorruptor.o
 
 # OTHER TARGETS
-all : ./bin/datacorruptor
+all : ./bin/dataCorruptor
 
 clean:
 	rm -f ./bin/*
