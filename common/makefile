@@ -1,3 +1,4 @@
+# TARGETS
 all:
 	mkdir -p bin
 	cp -r ../datacorruptor/bin/* ../datareader/bin/* bin/

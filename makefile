@@ -1,5 +1,7 @@
+# Directories
 SUBDIRS = datacorruptor datacreator datareader common
 
+# TARGETS
 .PHONY: all clean $(SUBDIRS)
 
 all: $(SUBDIRS)

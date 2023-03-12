@@ -21,12 +21,12 @@
 
 const char* logfilepath = "/tmp/dataMonitor.log";
 
-typedef struct {
+typedef struct DCInfo {
 	pid_t dcProcessID;
 	time_t lastTimeHeardFrom;
 } DCInfo;
 
-typedef struct {
+typedef struct MasterList {
 	int msgQueueID;
 	int numberOfDCs;
 	DCInfo dc[MAX_DC_ROLES];

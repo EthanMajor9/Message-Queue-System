@@ -65,7 +65,7 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 	int running = 1;
 	int randomNum;
 	int interval;
-	Log* log;
+	Log log;
 	time_t currentTime;
 	FILE* logfile;
 
@@ -90,7 +90,7 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 
 		// Fill log timestamp with current local time
 		currentTime = time(NULL);
-		log->timestamp = localtime(&currentTime);
+		log.timestamp = localtime(&currentTime);
 
 		switch(randomNum) {
 			// Do nothing
@@ -104,8 +104,8 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 11:
 				if(masterList->dc[0].dcProcessID != 0) {
 					killDC(masterList->dc[0].dcProcessID);
-					log->pid = masterList->dc[0].dcProcessID;
-					LogMessage(logfile, log, randomNum, 1);
+					log.pid = masterList->dc[0].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 1);
 				}
 				break;
 			// Kill DC-02
@@ -114,8 +114,8 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 13:
 				if(masterList->dc[1].dcProcessID != 0) {
 					killDC(masterList->dc[1].dcProcessID);
-					log->pid = masterList->dc[1].dcProcessID;
-					LogMessage(logfile, log, randomNum, 2);
+					log.pid = masterList->dc[1].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 2);
 				}
 				break;
 			// Kill DC-03
@@ -124,72 +124,72 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 15:
 				if(masterList->dc[2].dcProcessID != 0) {
 					killDC(masterList->dc[2].dcProcessID);
-					log->pid = masterList->dc[2].dcProcessID;
-					LogMessage(logfile, log, randomNum, 3);
+					log.pid = masterList->dc[2].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 3);
 				}
 				break;
 			// Kill DC-04
 			case 7:
 				if(masterList->dc[3].dcProcessID != 0) {
 					killDC(masterList->dc[3].dcProcessID);
-					log->pid = masterList->dc[3].dcProcessID;
-					LogMessage(logfile, log, randomNum, 4);
+					log.pid = masterList->dc[3].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 4);
 				}
 				break;
 			// Kill DC-05
 			case 9:
 				if(masterList->dc[4].dcProcessID != 0) {
 					killDC(masterList->dc[4].dcProcessID);
-					log->pid = masterList->dc[4].dcProcessID;
-					LogMessage(logfile, log, randomNum, 5);
+					log.pid = masterList->dc[4].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 5);
 				}
 				break;
 			// Delete message queue
 			case 10:
 			case 17:
 				killMessageQueue(masterList->msgQueueID);
-				log->pid = masterList->dc[4].dcProcessID;
-				LogMessage(logfile, log, randomNum, 5);
+				log.pid = masterList->dc[4].dcProcessID;
+				LogMessage(logfile, &log, randomNum, 5);
 				fclose(logfile);
 				return;
 			// Kill DC-06
 			case 12:
 				if(masterList->dc[5].dcProcessID != 0) {
 					killDC(masterList->dc[5].dcProcessID);
-					log->pid = masterList->dc[5].dcProcessID;
-					LogMessage(logfile, log, randomNum, 6);
+					log.pid = masterList->dc[5].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 6);
 				}
 				break;
 			// Kill DC-07
 			case 14:
 				if(masterList->dc[6].dcProcessID != 0) {
 					killDC(masterList->dc[6].dcProcessID);
-					log->pid = masterList->dc[6].dcProcessID;
-					LogMessage(logfile, log, randomNum, 7);
+					log.pid = masterList->dc[6].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 7);
 				}
 				break;
 			// Kill DC-08
 			case 16:
 				if(masterList->dc[7].dcProcessID != 0) {
 					killDC(masterList->dc[7].dcProcessID);
-					log->pid = masterList->dc[7].dcProcessID;
-					LogMessage(logfile, log, randomNum, 8);
+					log.pid = masterList->dc[7].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 8);
 				}
 				break;
 			// Kill DC-09
 			case 18:
 				if(masterList->dc[8].dcProcessID != 0) {
 					killDC(masterList->dc[8].dcProcessID);
-					log->pid = masterList->dc[8].dcProcessID;
-					LogMessage(logfile, log, randomNum, 9);
+					log.pid = masterList->dc[8].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 9);
 				}
 				break;
 			// Kill DC-10
 			case 20:
 				if(masterList->dc[9].dcProcessID != 0) {
 					killDC(masterList->dc[9].dcProcessID);
-					log->pid = masterList->dc[9].dcProcessID;
-					LogMessage(logfile, log, randomNum, 10);
+					log.pid = masterList->dc[9].dcProcessID;
+					LogMessage(logfile, &log, randomNum, 10);
 				}
 				break;
 		}
