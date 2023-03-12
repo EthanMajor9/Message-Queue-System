@@ -19,9 +19,7 @@ int main(int argc, char* argv[]) {
 	Log log;
 	FILE* logfile = NULL;
 
-	// Idk why but this is how it has to work, sorry 
-	msgQueueKey = (ftok("/home/ethan/Desktop/Projects/Hoochamacallit/common/bin",  15));
-	printf("MSG Queue Key: %d\n", msgQueueKey);
+	msgQueueKey = (ftok("../../common/bin",  15));
 
 	while ((qID = msgget(msgQueueKey, 0)) == -1) {
 		sleep(MIN_INTERVAL);
@@ -29,7 +27,6 @@ int main(int argc, char* argv[]) {
 	
 	int semID;
 	key_t semKey = ftok(".", 20);
-	printf("Semaphore Key: %d\n", semKey);
 
 	if((semID = semget(semKey, 1, 0)) == -1) {
 		if((semID = semget(semKey, 1, (IPC_CREAT | 0666))) == -1) {
@@ -81,7 +78,7 @@ int main(int argc, char* argv[]) {
 		}
 
 		if(semop(semID, &acquireOp, 1) == -1) {
-			printf("Couldn't acquire semaphore\n");
+			perror("SEMOP Error:");
 			continue;
 		}
 
@@ -95,7 +92,7 @@ int main(int argc, char* argv[]) {
 		fclose(logfile);
 
 		if(semop(semID, &releaseOp, 1) == -1) {
-			perror("SEMCTL Error:");
+			perror("SEMOP Error:");
 			exit(EXIT_FAILURE);
 		}
 	}

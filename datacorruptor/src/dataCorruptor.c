@@ -50,6 +50,8 @@ int main() {
         perror("SHMDT Error:");
         exit(1);
     }
+	
+	return 0;
 }
 
 
@@ -57,6 +59,14 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 	int running = 1;
 	int randomNum;
 	int interval;
+	Log* log;
+	time_t currentTime;
+	FILE* logfile;
+
+	if((logfile = fopen(logfilepath, "a")) == NULL) {
+		perror("FOPEN Error:");
+		exit(EXIT_FAILURE);
+	}
 
 	while(running) {
 		// Sleep for random interval between 10 and 30 seconds
@@ -64,11 +74,14 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 		sleep(interval);
 
 		if(checkMessageQueueExists(masterList) == 0) {
+			fclose(logfile);
 			return;
 		}
 
 		randomNum = rand() % 21;
-		printf("Randomnum = %d\n", randomNum);
+		currentTime = time(NULL);
+		log->timestamp = localtime(&currentTime);
+
 		switch(randomNum) {
 			// Do nothing
 			case 0:
@@ -81,6 +94,8 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 11:
 				if(masterList->dc[0].dcProcessID != 0) {
 					killDC(masterList->dc[0].dcProcessID);
+					log->pid = masterList->dc[0].dcProcessID;
+					LogMessage(logfile, log, randomNum, 1);
 				}
 				break;
 			// Kill DC-02
@@ -89,6 +104,8 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 13:
 				if(masterList->dc[1].dcProcessID != 0) {
 					killDC(masterList->dc[1].dcProcessID);
+					log->pid = masterList->dc[1].dcProcessID;
+					LogMessage(logfile, log, randomNum, 2);
 				}
 				break;
 			// Kill DC-03
@@ -97,62 +114,82 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 			case 15:
 				if(masterList->dc[2].dcProcessID != 0) {
 					killDC(masterList->dc[2].dcProcessID);
+					log->pid = masterList->dc[2].dcProcessID;
+					LogMessage(logfile, log, randomNum, 3);
 				}
 				break;
 			// Kill DC-04
 			case 7:
 				if(masterList->dc[3].dcProcessID != 0) {
 					killDC(masterList->dc[3].dcProcessID);
+					log->pid = masterList->dc[3].dcProcessID;
+					LogMessage(logfile, log, randomNum, 4);
 				}
 				break;
 			// Kill DC-05
 			case 9:
 				if(masterList->dc[4].dcProcessID != 0) {
 					killDC(masterList->dc[4].dcProcessID);
+					log->pid = masterList->dc[4].dcProcessID;
+					LogMessage(logfile, log, randomNum, 5);
 				}
 				break;
 			// Delete message queue
 			case 10:
 			case 17:
 				killMessageQueue(masterList->msgQueueID);
-				break;
+				log->pid = masterList->dc[4].dcProcessID;
+				LogMessage(logfile, log, randomNum, 5);
+				fclose(logfile);
+				return;
 			// Kill DC-06
 			case 12:
 				if(masterList->dc[5].dcProcessID != 0) {
 					killDC(masterList->dc[5].dcProcessID);
+					log->pid = masterList->dc[5].dcProcessID;
+					LogMessage(logfile, log, randomNum, 6);
 				}
 				break;
 			// Kill DC-07
 			case 14:
 				if(masterList->dc[6].dcProcessID != 0) {
 					killDC(masterList->dc[6].dcProcessID);
+					log->pid = masterList->dc[6].dcProcessID;
+					LogMessage(logfile, log, randomNum, 7);
 				}
 				break;
 			// Kill DC-08
 			case 16:
 				if(masterList->dc[7].dcProcessID != 0) {
 					killDC(masterList->dc[7].dcProcessID);
+					log->pid = masterList->dc[7].dcProcessID;
+					LogMessage(logfile, log, randomNum, 8);
 				}
 				break;
 			// Kill DC-09
 			case 18:
 				if(masterList->dc[8].dcProcessID != 0) {
 					killDC(masterList->dc[8].dcProcessID);
+					log->pid = masterList->dc[8].dcProcessID;
+					LogMessage(logfile, log, randomNum, 9);
 				}
 				break;
 			// Kill DC-10
 			case 20:
 				if(masterList->dc[9].dcProcessID != 0) {
 					killDC(masterList->dc[9].dcProcessID);
+					log->pid = masterList->dc[9].dcProcessID;
+					LogMessage(logfile, log, randomNum, 10);
 				}
 				break;
 		}
-	}	
+	}
+	fclose(logfile);
+	return;
 } 
 
 int checkMessageQueueExists(MasterList* masterList) {
     // Check if queue exists
-	printf("MSG Queue ID : %d\n", masterList->msgQueueID);
 	if(msgctl(masterList->msgQueueID, IPC_STAT, NULL) == -1) {
 		if (errno == ENOENT) {
 			// Detach the shared memory from the masterlist
@@ -175,5 +212,21 @@ void killDC(int DCtoKill){
 void killMessageQueue(int msgQueueID) {
 	if(msgctl(msgQueueID, IPC_RMID, NULL) == -1) {
 		perror("MSGCCTL Error:");
+	}
+}
+
+
+void LogMessage(FILE* logfile, Log* log, int action, int DCID) {
+	char formattedTime[TIME_LENGTH];
+	strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", log->timestamp);
+
+	// DC Killed
+	if(action != 10 && action != 17) {
+		fprintf(logfile, "[%s] : WOD Action %d - DC-%d [%d] TERMINATED\n", formattedTime, action, DCID, log->pid);
+	} 
+	// Message queue Killed
+	else  
+	{
+		fprintf(logfile, "[%s] : DC Deleted the msgQ - the DR/DCs can't talk anymore - exiting\n", formattedTime);
 	}
 }

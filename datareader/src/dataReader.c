@@ -13,6 +13,7 @@ int main(int argc, char* argv[])
 	FILE* logfile = NULL;
 
 	msgQueueKey = ftok(".",  15);
+	printf("MSG Queue Key : %d\n", msgQueueKey);
 	shmKey = ftok(".",  16535);
 
 	qID = checkMessageQueueExists(msgQueueKey);
