@@ -1,3 +1,10 @@
+/*
+* FILE: dataCreator.h
+* PROJECT: A-03 The Hoochamacallit System
+* FIRST VERSION: 03/11/2023
+* PROGRAMMER(s): Ethan Major, Caleb Brown
+* DESCRIPTION: This file contains the functions prototypes, structure definitions and constants required for dataCreator utility
+*/
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>

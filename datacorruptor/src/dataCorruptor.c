@@ -1,10 +1,12 @@
+/*
+* FILE: dataCorruptor.c
+* PROJECT: A-03 The Hoochamacallit System
+* FIRST VERSION: 03/11/2023
+* PROGRAMMER(s): Ethan Major, Caleb Brown
+* DESCRIPTION: This file contains the functions for the data corruptor utility that is used for the purpose of killing DC's and deleting the message queue at random
+*/
+
 #include "../inc/dataCorruptor.h"
-
-
-// TODO:
-//	LOGGING
-//  ERROR HANDLING
-//	CLEANUP
 
 int main() {
     int shmID = 0;
@@ -48,13 +50,17 @@ int main() {
 	// Detach the shared memory from the masterlist
 	if (shmdt(masterList) == -1) {
         perror("SHMDT Error:");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 	
 	return 0;
 }
 
-
+// FUNCTION: 	void wheelOfDeath(MasterList* masterList, int shmID)
+// DESCRIPTION: This function generates a random number between 0 and 20 and either kills the specified DC or deletes the message queue
+// PARAMETERS:  MasterList* masterList : pointer to the masterlist in shared memory
+//				int shmID: ID of the shared mem segment
+// RETURNS: 	None
 void wheelOfDeath(MasterList* masterList, int shmID) {
 	int running = 1;
 	int randomNum;
@@ -73,12 +79,16 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 		interval = (rand() % 21) + MIN_INTERVAL;
 		sleep(interval);
 
+		// Check if the message queue exists
 		if(checkMessageQueueExists(masterList) == 0) {
 			fclose(logfile);
 			return;
 		}
 
+		// Generate random number
 		randomNum = rand() % 21;
+
+		// Fill log timestamp with current local time
 		currentTime = time(NULL);
 		log->timestamp = localtime(&currentTime);
 
@@ -188,34 +198,47 @@ void wheelOfDeath(MasterList* masterList, int shmID) {
 	return;
 } 
 
+// FUNCTION: 	int checkMessageQueueExists(MasterList* masterList)
+// DESCRIPTION: This function checks if the message queue still exists
+// PARAMETERS:  MasterList* masterList : pointer to the masterlist in shared memory containing the message queue ID
+// RETURNS: 	Returns 0 if the message queue doesn't exist and 1 if it does
 int checkMessageQueueExists(MasterList* masterList) {
     // Check if queue exists
 	if(msgctl(masterList->msgQueueID, IPC_STAT, NULL) == -1) {
 		if (errno == ENOENT) {
-			// Detach the shared memory from the masterlist
-			if (shmdt(masterList) == -1) {
-				perror("SHMDT Error:");
-				exit(EXIT_FAILURE);
-			}
 			return 0;
 		}
 	}
 	return 1;
 }
 
-void killDC(int DCtoKill){
+// FUNCTION: 	void killDC(int DCtoKill)
+// DESCRIPTION: This function kills the specified DC by sending it a SIGHUP signal
+// PARAMETERS:  int DCtoKill: ID of the DC set for execution
+// RETURNS: 	None
+void killDC(int DCtoKill) {
 	if(kill(DCtoKill, SIGHUP) == -1) {
 		perror("KILL Error:");
 	}
 }
 
+// FUNCTION: 	void killMessageQueue(int msgQueueID)
+// DESCRIPTION: This function kills the specified message queue
+// PARAMETERS:  int msgQueueID: Id of the message queue set for execution
+// RETURNS: 	None
 void killMessageQueue(int msgQueueID) {
 	if(msgctl(msgQueueID, IPC_RMID, NULL) == -1) {
 		perror("MSGCCTL Error:");
 	}
 }
 
-
+// FUNCTION: 	void LogMessage(FILE* logfile, Log* log, int action, int DCID)
+// DESCRIPTION: This function logs events to the specified logging file
+// PARAMETERS:  FILE* logfile: Logfile to write to
+//				Log* log: Log struct with the information to be written
+// 				int action: Action performed
+//				int DCID: DC killed
+// RETURNS: 	None
 void LogMessage(FILE* logfile, Log* log, int action, int DCID) {
 	char formattedTime[TIME_LENGTH];
 	strftime(formattedTime, sizeof(formattedTime), "%Y-%m-%d %H:%M:%S", log->timestamp);
