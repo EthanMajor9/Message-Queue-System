@@ -12,13 +12,11 @@ int main(int argc, char* argv[])
 	Log log;
 	FILE* logfile = NULL;
 
-	msgQueueKey = ftok(".",  16535);
+	msgQueueKey = ftok(".",  15);
 	shmKey = ftok(".",  16535);
 
 	qID = checkMessageQueueExists(msgQueueKey);
 	shmID = checkSharedMemExists(shmKey);
-	
-	printf("Message Queue ID: %d\nShared mem ID: %d\n", qID, shmID);
 
 	// Attach shared mem to masterList
 	if((masterList = shmat(shmID, NULL, 0)) == (void*) -1) {
@@ -38,7 +36,7 @@ int main(int argc, char* argv[])
 	sleep(15);
 
 	// Open logfile
-	logfile = fopen(logfilepath, "w");
+	logfile = fopen(logfilepath, "a");
 
 	if(logfile == NULL) {
 		perror("fopen");
@@ -50,13 +48,12 @@ int main(int argc, char* argv[])
 
 	// Detach the shared memory from the masterlist
 	if (shmdt(masterList) == -1) {
-        perror("shmdt");
-        exit(1);
+        perror("SHMDT Error:");
     }
 
 	// Deallocate the message queue and shared memory
 	if (msgctl(qID, IPC_RMID, NULL) == -1 || shmctl(shmID, IPC_RMID, NULL) == -1) {
-		perror("msgctl");
+		perror("MSGCTL Error:");
 	}
 
 	// Close log file
@@ -145,6 +142,7 @@ void checkAndRemoveTimedOutEntries(MasterList* masterList, Message message, FILE
 	}
 }
 
+
 void updateOrAddDCMessage(MasterList* masterList, Message message, FILE* logfile) {
     for (int i = 0; i < MAX_DC_ROLES; i++) {
         if(message.pid == masterList->dc[i].dcProcessID) {
@@ -156,7 +154,6 @@ void updateOrAddDCMessage(MasterList* masterList, Message message, FILE* logfile
             masterList->numberOfDCs++;
             masterList->dc[i].dcProcessID = message.pid;
             masterList->dc[i].lastTimeHeardFrom = time(NULL);
-			printf("Added to masterlist\n");
             Log log = createLogEntry(i, message.pid, message.status, message.statusMsg, "added to the master list");
             LogMessage(logfile, &log);
             return;
@@ -180,28 +177,30 @@ void processStatus6Message(MasterList* masterList, Message message, FILE* logfil
 
 void processMessages(MasterList* masterList, FILE* logfile) {
 	int running = 1;
-    Message message;
+	int isFirstIt = 1;
+    Message message = {0};
     while (running) {
 		// Receive a message from the message queue
-        if (msgrcv(masterList->msgQueueID, &message, (sizeof(message) - sizeof(long)), 0, 0) == -1) {
+        if (msgrcv(masterList->msgQueueID, &message, (sizeof(message) - sizeof(long)), 0, IPC_NOWAIT) == -1) {
             if (errno != ENOMSG) {
-                perror("msgrcv");
+                perror("MSGRCV Error:");
                 exit(-1);
             }
-        }
-
-		// Check if the machine has gone offline
-        if (message.status == 6) {
-            processStatus6Message(masterList, message, logfile);
         } else {
-            updateOrAddDCMessage(masterList, message, logfile);
+			isFirstIt--;
+            // Check if the machine has gone offline
+            if (message.status == 6) {
+                processStatus6Message(masterList, message, logfile);
+            } else {
+                updateOrAddDCMessage(masterList, message, logfile);
+            }
         }
 
 		// Check the masterlist for any entries that have timed out
         checkAndRemoveTimedOutEntries(masterList, message, logfile);
 
 		// Check if any DC's are currently running
-        if (masterList->numberOfDCs == 0) {
+        if (masterList->numberOfDCs == 0 && isFirstIt <= 0) {
             running = 0;
         } else {
 			sleep(1.5);

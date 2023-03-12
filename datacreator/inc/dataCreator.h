@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <sys/sem.h>
 
 // Define the message queue key and message types
 #define MSG_OK 0
@@ -21,6 +22,7 @@
 #define TIME_LENGTH 25
 
 #define MESSAGE_SIZE 50
+#define SEM_INIT_VAL 1
 
 const char* logfilepath = "/tmp/dataCreator.log";
 
@@ -43,6 +45,9 @@ typedef struct Log {
 	int status;
 	const char* statusmsg;
 } Log;
+
+struct sembuf acquireOp = { 0, -1, SEM_UNDO };
+struct sembuf releaseOp = { 0, 1, SEM_UNDO };
 
 void LogMessage(FILE* logfile, Log* log);
 void generate_message_status(Message *msg);
